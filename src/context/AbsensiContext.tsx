@@ -33,29 +33,38 @@ export function AbsensiProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = React.useState(false);
 
   const refreshAbsensi = React.useCallback(async () => {
-    const unitId = user?.unitId || InisiasiService.getSelectedUnitId() || 'UL2';
-    console.log(`[ABSENSI TRACE] refreshAbsensi triggered. UnitId: ${unitId}`);
-    try {
-      setIsLoading(true);
-      const res = await ApiService.fetchAbsensi(unitId);
-      if (res.success && Array.isArray(res.data)) {
-        console.log(`[ABSENSI TRACE] fetchAbsensi success. Received ${res.data.length} records.`);
-        // Sort server data by date DESC
-        const sortedData = [...res.data].sort((a, b) => {
-          const dateA = new Date(a.TANGGAL || a.tanggal || 0).getTime();
-          const dateB = new Date(b.TANGGAL || b.tanggal || 0).getTime();
-          return dateB - dateA;
-        });
-        setAbsensiList(sortedData);
-      } else {
-        console.warn(`[ABSENSI TRACE] fetchAbsensi FAILED: ${res.message}`);
-      }
-    } catch (err) {
-      console.warn('[ABSENSI TRACE] refreshAbsensi Exception:', err);
-    } finally {
-      setIsLoading(false);
+  try {
+    const unitId = activeUnitId;
+
+    if (!unitId) {
+      console.warn('[ABSENSI] UnitId tidak tersedia.');
+      return;
     }
-  }, [user?.unitId]);
+
+    console.log('[ABSENSI TRACE] refreshAbsensi triggered. UnitId:', unitId);
+
+    const res = await ApiService.fetchAbsensi(unitId);
+
+    if (res.success && res.data) {
+      const filtered = res.data.filter(
+        a => !a.unitId || InisiasiService.isUserMatchingUnit(a.unitId, unitId)
+      );
+
+      console.log(
+        '[ABSENSI TRACE] fetchAbsensi success. Received:',
+        res.data.length,
+        'Filtered:',
+        filtered.length
+      );
+
+      setAbsensiList(filtered);
+    } else {
+      console.warn('[ABSENSI] HyperCloud tidak mengembalikan data:', res);
+    }
+  } catch (err) {
+    console.error('[ABSENSI] Error loading from HyperCloud API:', err);
+  }
+}, [activeUnitId]);
 
   // Initial load and unit change refresh
   React.useEffect(() => {
